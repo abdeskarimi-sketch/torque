@@ -1,12 +1,18 @@
 {
-  "generated": "2026-06-30T06:00:00Z",
-  "prices": { "BTC": 60000, "ETH": 1620, "BNB": 560, "SOL": 75.8, "XRP": 1.05 },
-  "dominance": 56.1,
-  "fng": 18,
+  "generated": "2026-06-30T06:36:58.126Z",
+  "prices": {
+    "BTC": 59479,
+    "ETH": 1589.52,
+    "BNB": 552.42,
+    "SOL": 74.01,
+    "XRP": 1.048
+  },
+  "dominance": 55.56864930219617,
+  "fng": 15,
   "fngLabel": "Extreme Fear",
   "funding": -0.0001,
   "mvrv": 1.1,
   "mvrvZ": -2.4,
   "etfFlowDay": null,
-  "etfFlowLabel": "\u2212$3.1B YTD"
+  "etfFlowLabel": "−$3.1B YTD"
 }
