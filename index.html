@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Cycle Engine v2 — Hardened</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#11161d; --panel2:#0e141b; --grid:#1b232c; --txt:#e6edf3; --muted:#8b949e;
+    --buy:#3fb950; --buyz:rgba(63,185,80,.13); --sell:#f87171; --sellz:rgba(248,113,113,.12);
+    --p50:#f7931a; --band:rgba(247,147,26,.10); --ath:#5b8def; --line:#283039;
+    --ok:#3fb950; --warn:#e3b341; --bad:#f87171; --neu:#7d8590;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;justify-content:center;padding:22px 12px}
+  .wrap{width:100%;max-width:980px}
+  h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:3px;margin-bottom:14px}
+  .sec{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 17px;margin-bottom:14px}
+  .sec h2{font-size:13px;font-weight:700;letter-spacing:.2px;text-transform:uppercase;color:#c9d1d9;margin-bottom:3px}
+  .sec .lead{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+  /* signal grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media(max-width:680px){.grid{grid-template-columns:repeat(2,1fr)}}
+  .mc{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 11px;position:relative}
+  .mc .nm{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .mc .vl{font-size:17px;font-weight:700;margin:2px 0 1px}
+  .mc .rd{font-size:10.5px;color:#c9d1d9}
+  .mc .nt{font-size:9.5px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .chip{position:absolute;top:10px;right:10px;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
+  .chip.buy{background:rgba(63,185,80,.16);color:var(--ok)}
+  .chip.sell{background:rgba(248,113,113,.16);color:var(--bad)}
+  .chip.neutral{background:rgba(125,133,144,.18);color:#aab1b8}
+  .verdict{margin-top:12px;background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--p50);border-radius:8px;padding:10px 12px;font-size:11.5px;color:#c9d1d9}
+  .verdict b{color:#fff}
+  /* coin tabs */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .tab{padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer}
+  .tab.active{color:#0b0f14}
+  .strip{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:2px 0 6px}
+  .cell{flex:1 1 0;min-width:88px;padding:7px 10px;border-right:1px solid var(--line)}
+  .cell:last-child{border-right:0}
+  .cell .k{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+  .cell .v{font-size:13px;font-weight:700;margin-top:2px}
+  .v.buy{color:var(--buy)}.v.sell{color:var(--sell)}
+  svg{width:100%;height:auto;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:5px;font-size:10.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .sw{width:15px;height:0;border-top-width:3px;border-top-style:solid}
+  .sw.dash{border-top-style:dashed}
+  .sw.bd{height:9px;width:15px;border:0;background:var(--band);border-radius:2px}
+  .sw.bz{height:9px;width:15px;border:0;background:var(--buyz);border-radius:2px}
+  .sw.sz{height:9px;width:15px;border:0;background:var(--sellz);border-radius:2px}
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}
+  th{text-align:left;padding:6px 8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+  td{padding:7px 8px;border-bottom:1px solid #161c24;vertical-align:top}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .bar{height:7px;border-radius:4px;background:#1b232c;overflow:hidden;margin-top:3px}
+  .bar > i{display:block;height:100%;border-radius:4px}
+  .st{font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
+  .st.armed{background:rgba(227,179,65,.16);color:var(--warn)}
+  .st.active{background:rgba(248,113,113,.18);color:var(--bad)}
+  .st.idle{background:rgba(125,133,144,.16);color:#9aa2aa}
+  .gl{stroke:var(--grid);stroke-width:1}
+  .yr{stroke:var(--grid);stroke-width:1;stroke-dasharray:2 4}
+  .axt{fill:var(--muted);font-size:10px}
+  .lbl{fill:var(--txt);font-size:10px;font-weight:600}
+  .pct{fill:#c9d1d9;font-size:9.5px;font-weight:600}
+  .buyt{fill:var(--buy);font-size:10px;font-weight:700}
+  .sellt{fill:var(--sell);font-size:10px;font-weight:700}
+  .disc{font-size:10px;color:var(--muted);line-height:1.55;margin-top:4px}
+  .ttabs{display:flex;gap:8px;margin-bottom:14px}
+  .ttab{padding:8px 20px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:13.5px;font-weight:700;cursor:pointer}
+  .ttab.active{background:var(--p50);color:#0b0f14;border-color:var(--p50)}
+  .mcard{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-bottom:9px}
+  .mcard h3{font-size:12.5px;color:#fff;margin-bottom:4px}
+  .mcard .r{font-size:11px;color:#c9d1d9;margin:3px 0;line-height:1.5}
+  .mcard .r b{color:#fff}
+  .tag{display:inline-block;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;min-width:52px}
+  .formula{display:block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;background:#0b0f14;border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin:5px 0;color:#9fd2ff;white-space:pre-wrap;line-height:1.55}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Crypto Cycle Engine <span style="color:var(--muted);font-weight:500">v2 — hardened</span></h1>
+  <div class="sub">The base-rate cycle scaffold, upgraded per the SWOT: probabilistic bands, a multi-factor confirmation layer, dispersion-based sizing, and pre-committed invalidation triggers. As of 30 Jun 2026.</div>
+
+  <div class="ttabs">
+    <button class="ttab active" id="vt_engine" onclick="showView('engine')">Engine</button>
+    <button class="ttab" id="vt_method" onclick="showView('method')">Methodology</button>
+  </div>
+
+  <div id="livebar" style="display:flex;align-items:center;gap:9px;margin:-4px 0 14px;font-size:11px;color:var(--muted)">
+    <span id="livedot" style="width:8px;height:8px;border-radius:50%;background:var(--neu);display:inline-block"></span>
+    <span id="livetxt">Loading…</span>
+    <button onclick="refresh(true)" style="margin-left:auto;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:10.5px;font-weight:600;padding:4px 11px;border-radius:7px;cursor:pointer">Refresh</button>
+  </div>
+
+  <div id="engineView">
+
+  <!-- ============ SIGNAL DASHBOARD ============ -->
+  <div class="sec">
+    <h2>1 · Confirmation Layer</h2>
+    <div class="lead">The cycle gives <i>timing</i>; these give <i>confirmation</i>. Each is scored against the "buy the Oct–Nov 2026 trough" thesis.</div>
+    <div class="grid" id="signals"></div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <!-- ============ PROBABILISTIC PROJECTION ============ -->
+  <div class="sec">
+    <h2>2 · Probabilistic Projection (P10 / P50 / P90)</h2>
+    <div class="lead">Point estimates retired. The fan is the outcome distribution; band width is uncertainty, not a target.</div>
+    <div class="tabs" id="tabs"></div>
+    <div class="strip" id="strip"></div>
+    <div id="chart"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <!-- ============ POSITION SIZING ============ -->
+  <div class="sec">
+    <h2>3 · Sizing — Inverse-Dispersion Weights</h2>
+    <div class="lead">Wider cone = lower conviction = smaller size. Weights ∝ 1 / (P90÷P10 at peak), normalized across the sleeve. Illustrative, not advice.</div>
+    <table id="sizetable"><thead><tr><th>Asset</th><th class="num">Peak P10–P90</th><th class="num">Dispersion</th><th>Suggested sleeve weight</th></tr></thead><tbody></tbody></table>
+    <div class="verdict" id="sleevegate" style="border-left-color:var(--bad)"></div>
+  </div>
+
+  <!-- ============ KILL CRITERIA ============ -->
+  <div class="sec">
+    <h2>4 · Kill Criteria — Pre-Committed Invalidation</h2>
+    <div class="lead">Written in advance so the thesis is falsifiable. Status reflects current readings.</div>
+    <table id="killtable"><thead><tr><th style="width:40%">Trigger</th><th>Means</th><th class="num">Status</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="disc">Mechanical extrapolation off n = 3 completed cycles, layered with current on-chain/flow readings. Dates are firmer than prices; the alt layer is weaker still. The live macro-override criterion means the cycle signal is currently subordinate to liquidity conditions. <b>Market history and scenario analysis, not investment advice.</b></div>
+  </div><!-- /engineView -->
+
+  <!-- ============ METHODOLOGY VIEW ============ -->
+  <div id="methodView" style="display:none">
+
+    <div class="sec">
+      <h2>A · Valuation metrics</h2>
+      <div class="lead">On-chain cost-basis measures — do they make the cycle's "deep value at the trough" claim, or refute it?</div>
+
+      <div class="mcard"><h3>MVRV Ratio</h3>
+        <div class="r"><span class="tag">What</span> Whether holders, in aggregate, sit in profit or loss versus what they actually paid.</div>
+        <span class="formula">MVRV = Market Cap / Realized Cap
+Market Cap   = price × circulating supply
+Realized Cap = Σ (value of each coin at the price it last moved on-chain)</span>
+        <div class="r"><span class="tag">Read</span> &gt;1 = average holder in profit; &lt;1 = underwater. Historically &gt;3.5–3.7 marks euphoric tops, &lt;1 marks capitulation bottoms.</div>
+        <div class="r"><span class="tag">Role</span> The cost-basis sanity check on the cycle. Current ~1.1 = accumulation zone, not yet capitulation.</div>
+      </div>
+
+      <div class="mcard"><h3>MVRV Z-Score</h3>
+        <div class="r"><span class="tag">What</span> How statistically stretched MVRV is, so tops/bottoms compare across cycles on one scale.</div>
+        <span class="formula">Z = (Market Cap − Realized Cap) / σ(Market Cap)
+  σ = standard deviation of market cap over history
+(variant: Z = (MVRV − mean₁₂ₘ) / std₁₂ₘ  — 12-month rolling)</span>
+        <div class="r"><span class="tag">Read</span> &gt;+7 = extreme overvaluation (every prior top); deeply negative = undervaluation.</div>
+        <div class="r"><span class="tag">Role</span> Normalizes MVRV. Current ~−2.4 = deep value, longest stretch below −2σ since the 2022 bottom.</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>B · Flow &amp; positioning metrics</h2>
+      <div class="lead">Who is buying, how leveraged they are, and where capital is rotating.</div>
+
+      <div class="mcard"><h3>ETF net flows</h3>
+        <div class="r"><span class="tag">What</span> Net institutional demand through US spot Bitcoin ETFs (IBIT, FBTC, ARKB, …).</div>
+        <span class="formula">Net flow = Σ (shares created − shares redeemed) × NAV   (per day / week)</span>
+        <div class="r"><span class="tag">Read</span> Inflow = ETFs absorbing BTC (demand); outflow = ETFs shedding BTC (supply pressure).</div>
+        <div class="r"><span class="tag">Role</span> Proxy for the marginal institutional bid. Currently negative (6+ weeks, −$3.1B YTD) → the down-leg isn't over.</div>
+      </div>
+
+      <div class="mcard"><h3>BTC dominance</h3>
+        <div class="r"><span class="tag">What</span> Bitcoin's share of total crypto market value.</div>
+        <span class="formula">Dominance = Market Cap(BTC) / Market Cap(all crypto) × 100%</span>
+        <div class="r"><span class="tag">Read</span> Rising = capital prefers BTC; falling below ~50% = altseason rotation into alts.</div>
+        <div class="r"><span class="tag">Role</span> Decides BTC-vs-alt weighting. ~56% and rising = "internal selection," alts lagging.</div>
+      </div>
+
+      <div class="mcard"><h3>Funding rate</h3>
+        <div class="r"><span class="tag">What</span> The recurring payment that keeps perpetual-futures price tethered to spot — a leverage gauge.</div>
+        <span class="formula">funding ≈ premium(perp − spot), paid ~every 8h
+  positive → longs pay shorts (crowded longs)
+  negative → shorts pay longs (crowded shorts)</span>
+        <div class="r"><span class="tag">Read</span> High positive = leverage froth (top risk); neutral/negative after a flush = deleveraged.</div>
+        <div class="r"><span class="tag">Role</span> Froth detector. Post-$861M long liquidation it's reset → no froth → not top-like.</div>
+      </div>
+
+      <div class="mcard"><h3>Fear &amp; Greed Index</h3>
+        <div class="r"><span class="tag">What</span> A 0–100 composite of market sentiment.</div>
+        <span class="formula">Composite of: volatility · momentum/volume · social media · dominance · search trends
+0 = Extreme Fear   ·   100 = Extreme Greed</span>
+        <div class="r"><span class="tag">Read</span> Contrarian at extremes — deep fear clusters near bottoms, greed near tops.</div>
+        <div class="r"><span class="tag">Role</span> Sentiment contrarian. Extreme Fear now = accumulation-friendly backdrop.</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>C · Projection mechanics</h2>
+      <div class="lead">How the trough date, peak date, and the price fan are actually derived.</div>
+
+      <div class="mcard"><h3>Cycle leg durations (the backbone)</h3>
+        <div class="r"><span class="tag">What</span> The cycle split into two measured legs whose lengths have been remarkably stable.</div>
+        <span class="formula">Top→Bottom leg  = days(peak → trough)        past: 410 / 363 / 376
+Bottom→Top leg  = days(trough → next peak)   past: 1067 / 1061 / 1050
+
+Trough = 6 Oct 2025 + 360–410 d  → Oct–Nov 2026
+Peak   = trough + 1050–1070 d    → ~Q3 2029</span>
+        <div class="r"><span class="tag">Role</span> Generates the dates — the model's highest-confidence output (timing, not price).</div>
+      </div>
+
+      <div class="mcard"><h3>P10 / P50 / P90 fan</h3>
+        <div class="r"><span class="tag">What</span> The outcome range, replacing single point targets.</div>
+        <span class="formula">P50 = central path (mid trough, base peak)
+P90 = shallower trough + higher peak   (optimistic)
+P10 = deeper trough  + lower peak      (pessimistic)
+
+trough price = 60–70% drawdown off the $126.3k ATH
+peak price   = current × collapsing low-to-high multiple (~2.5–4×)</span>
+        <div class="r"><span class="tag">Caveat</span> A <b>scenario fan</b>, not a statistically estimated distribution — labeled as percentiles for sizing convenience. Band width = honesty about uncertainty.</div>
+      </div>
+
+      <div class="mcard"><h3>Amplitude decay</h3>
+        <div class="r"><span class="tag">What</span> The measured shrinkage of each cycle's size — why the 2029 peak cone is wide and modest.</div>
+        <span class="formula">peak-to-peak multiple = peakₙ / peakₙ₋₁          3.5× → 1.8×
+low-to-high multiple  = peakₙ / troughₙ₋₁        130× → 20× → 8×
+drawdown              = (peak − trough) / peak   94% → 77% → ~52%</span>
+        <div class="r"><span class="tag">Role</span> Sets the diminishing peak target and the shallower-trough expectation.</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>D · Sizing &amp; kill logic</h2>
+
+      <div class="mcard"><h3>Inverse-dispersion weighting</h3>
+        <div class="r"><span class="tag">What</span> Converts each asset's uncertainty into a position size — wider cone, smaller size.</div>
+        <span class="formula">Dispersion  Dᵢ = P90_peak / P10_peak
+Weight      wᵢ = (1 / Dᵢ) / Σ (1 / Dⱼ)        (normalized to 100%)</span>
+        <div class="r"><span class="tag">Read</span> An inverse-variance-style heuristic: higher conviction (tighter cone) earns more capital. BTC (1.68×) tightest → biggest weight; XRP (6.5×) widest → smallest.</div>
+      </div>
+
+      <div class="mcard"><h3>Kill-criteria status</h3>
+        <div class="r"><span class="tag">What</span> Pre-written, falsifiable triggers that retire or down-weight the model.</div>
+        <span class="formula">idle   = not near the trigger
+armed  = one condition close / actively watched
+active = currently firing → act now</span>
+        <div class="r"><span class="tag">Role</span> Converts the model's weaknesses (n=3, macro override) into explicit exits. The macro-override criterion is <b>active</b> today, so the engine tells you to down-weight the cycle until flows confirm.</div>
+      </div>
+    </div>
+
+    <div class="disc">Formula conventions follow Glassnode / CryptoQuant / CoinGlass public definitions. On-chain figures carry ~24h lag; thresholds are historical, not guarantees. <b>Educational — not investment advice.</b></div>
+  </div><!-- /methodView -->
+</div>
+
+<script>
+/* ---------- coin data ---------- */
+const COINS = {
+  BTC:{name:"Bitcoin",tk:"BTC",color:"#f7931a",now:60000,ath:126300,troughLo:39000,troughMid:45000,troughHi:55000,peakLo:110000,peakBase:145000,peakHi:185000,sellStart:110000,sellHeavy:130000,
+       realized:[[-5,97900],[-4,60000],[-3,70000],[-2,82850],[-1,67076],[0,58115]]},
+  ETH:{name:"Ethereum",tk:"ETH",color:"#8a92b2",now:1620,ath:4878,troughLo:1100,troughMid:1300,troughHi:1500,peakLo:3000,peakBase:5000,peakHi:8000,sellStart:3500,sellHeavy:5000},
+  BNB:{name:"BNB",tk:"BNB",color:"#f3ba2f",now:560,ath:793,troughLo:420,troughMid:470,troughHi:520,peakLo:800,peakBase:1300,peakHi:1800,sellStart:900,sellHeavy:1300},
+  SOL:{name:"Solana",tk:"SOL",color:"#14c79b",now:75.8,ath:294,troughLo:45,troughMid:55,troughHi:62,peakLo:150,peakBase:320,peakHi:500,sellStart:200,sellHeavy:320},
+  XRP:{name:"XRP",tk:"XRP",color:"#5b8def",now:1.05,ath:3.40,troughLo:0.70,troughMid:0.82,troughHi:0.95,peakLo:2.00,peakBase:6.00,peakHi:13.00,sellStart:3.00,sellHeavy:6.00}
+};
+const ORDER=["BTC","ETH","BNB","SOL","XRP"];
+
+/* ---------- 1. signals ---------- */
+const SIG=[
+ {nm:"MVRV Ratio",vl:"1.1",rd:"Accumulation zone",v:"buy",nt:"Near historic-bottom band; not yet capitulation (<1)."},
+ {nm:"MVRV Z-Score",vl:"−2.4",rd:"Deep undervaluation",v:"buy",nt:"Longest sustained undervaluation since the 2022 bottom."},
+ {nm:"ETF net flows",vl:"−$3.1B",rd:"6+ wks outflows",v:"sell",nt:"Institutional bid absent — the down-leg isn't over."},
+ {nm:"BTC dominance",vl:"56%",rd:"Rising · alts lag",v:"neutral",nt:"Capital concentrating in BTC ('internal selection')."},
+ {nm:"Funding rates",vl:"~neutral/neg",rd:"Reset post-flush",v:"neutral",nt:"$861M longs liquidated; no leverage froth = not a top."},
+ {nm:"Fear & Greed",vl:"Extreme Fear",rd:"Capitulating",v:"buy",nt:"Contrarian-positive for accumulation."}
+];
+function renderSignals(){
+document.getElementById('signals').innerHTML=SIG.map(s=>`
+  <div class="mc"><span class="chip ${s.v}">${s.v==='buy'?'CONFIRMS':s.v==='sell'?'CONTRADICTS':'NEUTRAL'}</span>
+    <div class="nm">${s.nm}</div><div class="vl">${s.vl}</div><div class="rd">${s.rd}</div><div class="nt">${s.nt}</div></div>`).join('');
+const nBuy=SIG.filter(s=>s.v==='buy').length, nSell=SIG.filter(s=>s.v==='sell').length;
+document.getElementById('verdict').innerHTML=
+ `<b>Composite: accumulation-leaning, but momentum still negative.</b> Valuation (${nBuy} signals) says deep value; flows/momentum (${nSell}) say the bid hasn't returned. Net read: consistent with the model — you're in <b>value territory by cost-basis but the trough is likely not yet in</b>, which is exactly what a ~Oct–Nov 2026 low implies. Do not front-run the buy zone on valuation alone; wait for flows to turn.`;
+}
+renderSignals();
+
+/* ---------- 2. chart ---------- */
+const PL=68,PR=782,PT=46,PB=330, M0=-6,M1=42;
+const X=m=> PL+(m-M0)/(M1-M0)*(PR-PL);
+function fmt(v){ if(v>=1000)return "$"+(v/1000).toFixed(v<10000?1:0)+"k"; if(v>=10)return "$"+v.toFixed(0); return "$"+v.toFixed(2);}
+const ANCH=[[4,0],[7,0.04],[13,0.14],[19,0.30],[25,0.50],[31,0.70],[39,1.00],[42,0.70]];
+function path(now,t,p){let a=[[0,now]];for(const x of ANCH)a.push([x[0],t+x[1]*(p-t)]);return a;}
+let cur='BTC';
+function render(key){
+  cur=key;
+  const c=COINS[key];
+  const yMin=c.troughLo*0.78, yMax=c.peakHi*1.10, lo=Math.log(yMin), hi=Math.log(yMax);
+  const Y=v=>PB-(Math.log(v)-lo)/(hi-lo)*(PB-PT);
+  let ticks=[];for(let i=0;i<6;i++){let v=Math.exp(lo+i/5*(hi-lo));let m=Math.pow(10,Math.floor(Math.log10(v)));v=Math.round(v/m*2)/2*m;if(!ticks.includes(v))ticks.push(v);}
+  const p50=path(c.now,c.troughMid,c.peakBase), p90=path(c.now,c.troughHi,c.peakHi), p10=path(c.now,c.troughLo,c.peakLo);
+  const poly=a=>a.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join(" ");
+  const band="M"+p90.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join(" L")+" L"+[...p10].reverse().map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join(" L")+" Z";
+  const real=c.realized?c.realized.map(p=>[p[0],p[1]]):[[0,c.now]];
+  let s=`<svg viewBox="0 0 800 390">`;
+  s+=`<rect x="${X(3).toFixed(1)}" y="${PT}" width="${(X(6)-X(3)).toFixed(1)}" height="${PB-PT}" fill="var(--buyz)"/>`;
+  s+=`<rect x="${X(31).toFixed(1)}" y="${PT}" width="${(X(39)-X(31)).toFixed(1)}" height="${PB-PT}" fill="var(--sellz)"/>`;
+  for(const t of ticks){const y=Y(t).toFixed(1);s+=`<line class="gl" x1="${PL}" y1="${y}" x2="${PR}" y2="${y}"/><text class="axt" x="${PL-7}" y="${(+y+3).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;}
+  for(const m of[7,19,31])s+=`<line class="yr" x1="${X(m).toFixed(1)}" y1="${PT}" x2="${X(m).toFixed(1)}" y2="${PB}"/>`;
+  for(const yl of[[-3,"2026"],[13,"2027"],[25,"2028"],[37,"2029"]])s+=`<text class="axt" x="${X(yl[0]).toFixed(1)}" y="${PB+16}" text-anchor="middle">${yl[1]}</text>`;
+  if(c.ath<yMax&&c.ath>yMin){const ya=Y(c.ath).toFixed(1);s+=`<line x1="${PL}" y1="${ya}" x2="${PR}" y2="${ya}" stroke="var(--ath)" stroke-width="1.1" stroke-dasharray="6 5" opacity=".7"/><text class="pct" x="${PR-2}" y="${(+ya-4).toFixed(1)}" text-anchor="end" fill="var(--ath)">prior ATH</text>`;}
+  s+=`<path d="${band}" fill="var(--band)"/>`;
+  s+=`<polyline points="${poly(p90)}" fill="none" stroke="#9aa2aa" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+  s+=`<polyline points="${poly(p10)}" fill="none" stroke="#9aa2aa" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+  s+=`<polyline points="${poly(p50)}" fill="none" stroke="var(--p50)" stroke-width="2.3" stroke-dasharray="7 5"/>`;
+  s+=`<polyline points="${poly(real)}" fill="none" stroke="${c.color}" stroke-width="2.7"/>`;
+  // percentile labels at peak
+  s+=`<text class="pct" x="${(X(39)+5).toFixed(1)}" y="${(Y(c.peakHi)+3).toFixed(1)}">P90 ${fmt(c.peakHi)}</text>`;
+  s+=`<text class="pct" x="${(X(39)+5).toFixed(1)}" y="${(Y(c.peakBase)+3).toFixed(1)}" fill="var(--p50)">P50 ${fmt(c.peakBase)}</text>`;
+  s+=`<text class="pct" x="${(X(39)+5).toFixed(1)}" y="${(Y(c.peakLo)+3).toFixed(1)}">P10 ${fmt(c.peakLo)}</text>`;
+  // buy / sell
+  const bx=X(4),by=Y(c.troughMid);
+  s+=`<polygon points="${bx.toFixed(1)},${(by+6).toFixed(1)} ${(bx-5).toFixed(1)},${(by+15).toFixed(1)} ${(bx+5).toFixed(1)},${(by+15).toFixed(1)}" fill="var(--buy)"/>`;
+  s+=`<text class="buyt" x="${(bx+9).toFixed(1)}" y="${(by+32).toFixed(1)}">BUY ${fmt(c.troughLo)}–${fmt(c.troughHi)}</text>`;
+  s+=`<circle cx="${X(31).toFixed(1)}" cy="${Y(c.sellStart).toFixed(1)}" r="3.3" fill="var(--sell)"/>`;
+  s+=`<circle cx="${X(36).toFixed(1)}" cy="${Y(c.sellHeavy).toFixed(1)}" r="3.3" fill="var(--sell)"/>`;
+  s+=`<text class="sellt" x="${X(33).toFixed(1)}" y="${PT+12}" text-anchor="middle">SELL — scale out before peak</text>`;
+  s+=`<circle cx="${X(0).toFixed(1)}" cy="${Y(c.now).toFixed(1)}" r="3.3" fill="#fff"/>`;
+  s+=`<text class="lbl" x="${(X(0)+6).toFixed(1)}" y="${(Y(c.now)+13).toFixed(1)}">now ${fmt(c.now)}</text>`;
+  s+=`</svg>`;
+  document.getElementById('chart').innerHTML=s;
+  document.getElementById('strip').innerHTML=
+    `<div class="cell"><div class="k">Now</div><div class="v">${fmt(c.now)}</div></div>
+     <div class="cell"><div class="k">Buy (P10–P50)</div><div class="v buy">${fmt(c.troughLo)}–${fmt(c.troughHi)}</div></div>
+     <div class="cell"><div class="k">Scale out</div><div class="v sell">${fmt(c.sellStart)}→${fmt(c.sellHeavy)}</div></div>
+     <div class="cell"><div class="k">P50 peak</div><div class="v">${fmt(c.peakBase)}</div></div>
+     <div class="cell"><div class="k">P10–P90 peak</div><div class="v">${fmt(c.peakLo)}–${fmt(c.peakHi)}</div></div>`;
+  document.getElementById('legend').innerHTML=
+    `<span><i class="sw" style="border-top-color:${c.color}"></i>${c.tk} realized</span>
+     <span><i class="sw dash" style="border-top-color:var(--p50)"></i>P50 (base)</span>
+     <span><i class="sw bd"></i>P10–P90 band</span>
+     <span><i class="sw bz"></i>Buy</span><span><i class="sw sz"></i>Sell</span>`;
+  ORDER.forEach(k=>{const e=document.getElementById('t_'+k);e.classList.toggle('active',k===key);e.style.background=k===key?COINS[k].color:'var(--panel2)';e.style.borderColor=k===key?COINS[k].color:'var(--line)';});
+}
+const tabsEl=document.getElementById('tabs');
+ORDER.forEach(k=>{const b=document.createElement('button');b.className='tab';b.id='t_'+k;b.textContent=COINS[k].tk;b.onclick=()=>render(k);tabsEl.appendChild(b);});
+
+/* ---------- 3. sizing ---------- */
+const disp=ORDER.map(k=>({k,d:COINS[k].peakHi/COINS[k].peakLo}));
+const invSum=disp.reduce((a,x)=>a+1/x.d,0);
+const tb=document.querySelector('#sizetable tbody');
+tb.innerHTML=disp.map(x=>{const c=COINS[x.k];const w=(1/x.d)/invSum*100;
+  return `<tr><td><b>${c.tk}</b></td><td class="num">${fmt(c.peakLo)}–${fmt(c.peakHi)}</td><td class="num">${x.d.toFixed(2)}×</td>
+   <td>${w.toFixed(1)}%<div class="bar"><i style="width:${w*2.6}%;background:${c.color}"></i></div></td></tr>`;}).join('');
+document.getElementById('sleevegate').innerHTML=
+ `<b>Sleeve gate — REDUCED.</b> With the macro-override kill-criterion live (BTC–equity correlation ~0.9, Fed-hike odds high) and flows still negative, hold the total crypto sleeve below target and stage entries into the Oct–Nov 2026 window. Scale the sleeve up only as the confirmation layer flips (flows positive, dominance rolling over).`;
+
+/* ---------- 4. kill criteria ---------- */
+const KILL=[
+ {t:"BTC reclaims >$90k <b>without</b> MVRV ever dipping <1.0",m:"Institutional floor held — ~$58–60k was the low. Abandon the deep-trough buy; chase the recovery instead.",s:"idle",lab:"monitoring"},
+ {t:"BTC monthly close < $50k",m:"Trough zone re-anchors lower; widen the buy band and slow the scale-in.",s:"armed",lab:"armed"},
+ {t:"MVRV > 3.5 <b>or</b> Z > +5 <b>or</b> sustained Extreme Greed",m:"Euphoria — force distribution regardless of the calendar. The sell discipline overrides the date.",s:"idle",lab:"not near"},
+ {t:"No lower low (below ~$56k) by 31 Dec 2026",m:"Down-leg thesis weakening; the 'cycle is stretching/dead' case gains weight. Stand down on the deep buy.",s:"armed",lab:"armed"},
+ {t:"BTC dominance breaks < 50% with rising alt volume",m:"Altseason trigger — rotate weight from BTC toward the alt sleeve.",s:"idle",lab:"not triggered"},
+ {t:"Fed hiking & BTC–equity correlation > 0.8 in risk-off",m:"Cycle signal is subordinate to macro. Reduce reliance on the model; size down.",s:"active",lab:"ACTIVE"}
+];
+function renderKill(){
+document.querySelector('#killtable tbody').innerHTML=KILL.map(k=>
+ `<tr><td>${k.t}</td><td style="color:var(--muted)">${k.m}</td><td class="num"><span class="st ${k.s}">${k.lab}</span></td></tr>`).join('');
+}
+renderKill();
+
+function showView(v){
+  document.getElementById('engineView').style.display = v==='engine'?'block':'none';
+  document.getElementById('methodView').style.display = v==='method'?'block':'none';
+  document.getElementById('vt_engine').classList.toggle('active',v==='engine');
+  document.getElementById('vt_method').classList.toggle('active',v==='method');
+}
+
+render('BTC');
+
+/* ===================== DATA LAYER (hands-off) =====================
+   Primary source: ./data.json — regenerated daily by the GitHub Action
+   (includes MVRV & ETF flows via keyed APIs). Optional live override of the
+   4 free metrics for intra-day freshness. Fallback: baked-in snapshot. */
+const LIVE_IDS={BTC:'bitcoin',ETH:'ethereum',BNB:'binancecoin',SOL:'solana',XRP:'ripple'};
+function setBadge(s,t){const d=document.getElementById('livedot'),x=document.getElementById('livetxt');if(!d)return;
+  d.style.background={live:'var(--ok)',snap:'var(--warn)',load:'var(--neu)'}[s]||'var(--neu)';x.textContent=t;}
+function S(nm){return SIG.find(x=>x.nm===nm);}
+function fmtUsd(v){const a=Math.abs(v),s=v<0?'\u2212':'';if(a>=1e9)return s+'$'+(a/1e9).toFixed(1)+'B';if(a>=1e6)return s+'$'+(a/1e6).toFixed(0)+'M';return s+'$'+a;}
+function applyData(d){
+  if(d.prices)for(const k in LIVE_IDS){const v=d.prices[k]??(d.prices[LIVE_IDS[k]]&&d.prices[LIVE_IDS[k]].usd);if(v)COINS[k].now=v;}
+  let s;
+  if(d.mvrv!=null&&(s=S('MVRV Ratio'))){s.vl=(+d.mvrv).toFixed(2);s.rd=d.mvrv<1?'Capitulation (<1)':d.mvrv>3.5?'Euphoria (>3.5)':'Accumulation zone';s.v=d.mvrv<1.5?'buy':d.mvrv>3.5?'sell':'neutral';}
+  if(d.mvrvZ!=null&&(s=S('MVRV Z-Score'))){s.vl=(d.mvrvZ>0?'+':'\u2212')+Math.abs(+d.mvrvZ).toFixed(1);s.rd=d.mvrvZ>5?'Overvalued':d.mvrvZ<0?'Deep undervaluation':'Fair value';s.v=d.mvrvZ<0?'buy':d.mvrvZ>5?'sell':'neutral';}
+  if((d.etfFlowLabel||d.etfFlowDay!=null)&&(s=S('ETF net flows'))){s.vl=d.etfFlowLabel||fmtUsd(d.etfFlowDay);const neg=(d.etfFlowDay!=null?d.etfFlowDay<0:/[\u2212-]\s*\$/.test(s.vl));s.rd=neg?'Outflows':'Inflows';s.v=neg?'sell':'buy';}
+  if(d.dominance!=null&&(s=S('BTC dominance'))){s.vl=(+d.dominance).toFixed(0)+'%';s.rd=d.dominance>=50?'Rising \u00b7 alts lag':'Falling \u00b7 alts bid';}
+  if(d.fng!=null&&(s=S('Fear & Greed'))){s.vl=d.fngLabel||String(d.fng);s.rd='Index '+d.fng+'/100';s.v=d.fng<=25?'buy':d.fng>=75?'sell':'neutral';}
+  if(d.funding!=null&&(s=S('Funding rate'))){const p=d.funding*100;s.vl=p.toFixed(3)+'%/8h';s.rd=p>0.05?'Longs crowded':(p<0?'Shorts crowded':'Flat / reset');s.v=p>0.05?'sell':'neutral';}
+  const px=COINS.BTC.now,dom=d.dominance,fng=d.fng,mv=d.mvrv,set=(i,st,lab)=>{KILL[i].s=st;KILL[i].lab=lab;};
+  if(px!=null){set(0,(px>90000&&(mv==null||mv>=1))?'active':'idle',px>90000?'CHECK: floor held?':'monitoring');
+               set(1,px<50000?'active':'armed',px<50000?'BREACHED':'armed');}
+  if(mv!=null){set(2,(mv>3.5||(fng!=null&&fng>=75))?'active':'idle',(mv>3.5)?'EUPHORIA':'not near');}
+  else if(fng!=null){set(2,fng>=75?'armed':'idle',fng>=75?'greed rising':'not near');}
+  if(dom!=null) set(4,dom<50?'active':'idle',dom<50?'TRIGGERED':'not triggered');
+}
+function repaint(){renderSignals();renderKill();render(cur);}
+async function gj(u,o,ms=9000){const c=new AbortController(),i=setTimeout(()=>c.abort(),ms);try{const r=await fetch(u,{...(o||{}),signal:c.signal});clearTimeout(i);if(!r.ok)throw 0;return await r.json();}catch(e){clearTimeout(i);throw e;}}
+async function liveOverride(){
+  try{
+    const [pr,gl,fg,fu]=await Promise.allSettled([
+      gj('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,binancecoin,solana,ripple&vs_currencies=usd'),
+      gj('https://api.coingecko.com/api/v3/global'),
+      gj('https://api.alternative.me/fng/?limit=1'),
+      gj('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT')
+    ]);
+    const d={};
+    if(pr.status==='fulfilled')d.prices=pr.value;
+    if(gl.status==='fulfilled')d.dominance=gl.value&&gl.value.data&&gl.value.data.market_cap_percentage&&gl.value.data.market_cap_percentage.btc;
+    if(fg.status==='fulfilled'){const f=fg.value&&fg.value.data&&fg.value.data[0];if(f){d.fng=+f.value;d.fngLabel=f.value_classification;}}
+    if(fu.status==='fulfilled')d.funding=parseFloat(fu.value&&fu.value.lastFundingRate);
+    if(d.prices||d.dominance!=null||d.fng!=null){applyData(d);repaint();return true;}
+  }catch(e){}
+  return false;
+}
+async function refresh(force){
+  setBadge('load','Loading\u2026');
+  let ok=false,gen=null;
+  try{const d=await gj('./data.json?ts='+Date.now());applyData(d);repaint();gen=d.generated;ok=true;}catch(e){}
+  const live=await liveOverride();
+  if(ok){setBadge('live','Updated '+(gen?new Date(gen).toLocaleDateString():'daily')+(live?' \u00b7 live prices':''));}
+  else if(live){setBadge('live','Live \u00b7 '+new Date().toLocaleString());}
+  else{repaint();setBadge('snap','Offline \u2014 showing 30 Jun 2026 snapshot');}
+}
+refresh(false);
+</script>
+</body>
+</html>
