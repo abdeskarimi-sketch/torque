@@ -1,15 +1,15 @@
 {
-  "generated": "2026-09-21T12:25:26.066Z",
+  "generated": "2026-09-22T11:15:41.654Z",
   "prices": {
-    "BTC": 85161,
-    "ETH": 2723.85,
-    "BNB": 789.55,
-    "SOL": 116.62,
-    "XRP": 1.49
+    "BTC": 85903,
+    "ETH": 2738.95,
+    "BNB": 785.34,
+    "SOL": 116.71,
+    "XRP": 1.53
   },
-  "dominance": 59.20187878127341,
-  "fng": 70,
-  "fngLabel": "Greed",
+  "dominance": 58.92633616400175,
+  "fng": 78,
+  "fngLabel": "Extreme Greed",
   "funding": -0.0001,
   "mvrv": 1.1,
   "mvrvZ": -2.4,
